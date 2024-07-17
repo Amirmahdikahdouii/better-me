@@ -1,4 +1,5 @@
-from db.db import get_connection
+from web import app
+
 
 if __name__ == "__main__":
-    get_connection()
+    app.run(debug=True)
