@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
-from .db import Base
+from .db import Base, engine
 
 
 class User(Base):
@@ -11,6 +11,7 @@ class User(Base):
     first_name = Column(String(50), nullable=True, )
     last_name = Column(String(50), nullable=True, )
     username = Column(String(50), nullable=True, )
+    state = Column(String(50), nullable=True, )
     habits = relationship("UserHabit", back_populates="user")
 
     def __repr__(self):
@@ -27,3 +28,4 @@ class UserHabit(Base):
 
     def __repr__(self):
         return self.user.user_id
+
