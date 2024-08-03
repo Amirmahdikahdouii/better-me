@@ -17,6 +17,9 @@ class User(Base):
     def __repr__(self):
         return f"{self.id}. {self.user_id}"
 
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}"
+
 
 class UserHabit(Base):
     __tablename__ = "habits"
@@ -29,3 +32,5 @@ class UserHabit(Base):
     def __repr__(self):
         return self.user.user_id
 
+    def __str__(self):
+        return self.name
