@@ -1,4 +1,4 @@
-from web import app
+# from web import app
 from bot import bot
 
 if __name__ == "__main__":

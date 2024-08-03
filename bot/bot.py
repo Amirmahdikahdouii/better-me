@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from db.db import get_db
 from db.models import User
 
-
 bot = telebot.TeleBot(BOT_TOKEN)
 db: Session = next(get_db())
 
@@ -45,7 +44,10 @@ def send_welcome(message):
         )
     user_states[user_id] = "start"
 
+
 new_habit_condition = lambda message: message.text == "New Habit" and user_states[message.from_user.id] == "start"
+
+
 @bot.message_handler(func=new_habit_condition, chat_types=['private'])
 def new_habit(message):
     user_id = message.from_user.id
@@ -64,6 +66,8 @@ def add_new_habit(message):
 
 
 list_habit_condition = lambda message: user_states[message.from_user.id] == 'start' and message.text == "List Habit"
+
+
 @bot.message_handler(func=list_habit_condition, chat_types=['private'])
 def list_habit(message):
     user_id = message.from_user.id
@@ -75,5 +79,6 @@ def list_habit(message):
     else:
         bot.send_message(user_id, output, reply_markup=create_menu())
     user_states[user_id] = 'start'
+
 
 bot.infinity_polling()

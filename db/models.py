@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
 from .db import Base
 
 
@@ -10,3 +11,19 @@ class User(Base):
     first_name = Column(String(50), nullable=True, )
     last_name = Column(String(50), nullable=True, )
     username = Column(String(50), nullable=True, )
+    habits = relationship("UserHabit", back_populates="user")
+
+    def __repr__(self):
+        return f"{self.id}. {self.user_id}"
+
+
+class UserHabit(Base):
+    __tablename__ = "habits"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(50))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user = relationship("User", back_populates="habits")
+
+    def __repr__(self):
+        return self.user.user_id
