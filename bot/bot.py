@@ -3,7 +3,7 @@ from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardBut
 from config import BOT_TOKEN
 from sqlalchemy.orm import Session
 from db.db import get_db
-from db.models import User, UserHabit
+from db.models import User, UserHabit, HabitNote
 
 bot = telebot.TeleBot(BOT_TOKEN)
 db: Session = next(get_db())
@@ -12,12 +12,23 @@ user_states = {}
 user_habits = {}
 
 
-def get_user(user_id: int):
+def get_user(user_id: int) -> User | None:
+    """
+    Retrieve user from database
+    Args:
+        user_id (int): user_id given from messages.from_user.id
+    Returns:
+        User | None based on user exist in database or not.
+    """
     user = db.query(User).filter(User.user_id == user_id).first()
     return user if user else None
 
 
-def set_user_state(user: User, state: str):
+def set_user_state(user: User, state: str) -> User:
+    """
+    Set state for user on database
+    """
+
     user.state = state
     db.add(user)
     db.commit()
@@ -25,7 +36,10 @@ def set_user_state(user: User, state: str):
     return user
 
 
-def get_user_state(message):
+def get_user_state(message) -> str:
+    """
+    Return user state stored in database, or empty string if user not exists.
+    """
     user = get_user(message.from_user.id)
     return user.state if user else ""
 
@@ -153,6 +167,7 @@ def get_user_habit(callback):
 def select_habit_keyboard():
     keyboard = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True, row_width=2)
     keyboard.row(KeyboardButton("Edit Name"), KeyboardButton("Delete Habit"))
+    keyboard.row(KeyboardButton("Notes"), KeyboardButton("Add Note"))
     keyboard.row(KeyboardButton("Main Menu"))
     return keyboard
 
@@ -255,16 +270,118 @@ def delete_user_habit(callback):
     user = set_user_state(user, "start")
 
 
-def cancel_delete_suer_habit_condition(callback):
+def cancel_delete_user_habit_condition(callback):
     if callback.data == "cancel_delete_habit":
         return True
     return False
 
 
-@bot.callback_query_handler(func=cancel_delete_suer_habit_condition)
-def cancel_delete_suer_habit(callback):
+@bot.callback_query_handler(func=cancel_delete_user_habit_condition)
+def cancel_delete_user_habit(callback):
     bot.delete_message(callback.message.chat.id, callback.json["message"]['message_id'])
     bot.send_message(callback.from_user.id, "Delete Habit canceled!", reply_markup=select_habit_keyboard())
 
+
+def main_menu_condition(message):
+    user_id = message.from_user.id
+    user = get_user(user_id)
+    if user.state != "start" and message.text == "Main Menu":
+        return True
+    return False
+
+
+@bot.message_handler(func=main_menu_condition, chat_types=['private'])
+def return_main_menu(message):
+    user_id = message.from_user.id
+    user = get_user(user_id)
+    user.state = "start"
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    bot.send_message(user_id, "Please select your option: ", reply_markup=main_menu())
+
+
+def change_state_to_add_note_for_habit_condition(message):
+    user_id = message.from_user.id
+    habit = get_habit(user_id)
+    if habit and get_user_state(message).startswith("habit") and message.text == "Add Note":
+        return True
+    return False
+
+
+@bot.message_handler(func=change_state_to_add_note_for_habit_condition, chat_types=['private'])
+def change_state_to_add_note_for_habit(message):
+    user_id = message.from_user.id
+    user = get_user(user_id)
+    habit_id = user.state[-1]
+    set_user_state(user, f"add_note_for_habit-{habit_id}")
+    bot.send_message(user_id, "Alright, Please Write title for your note (send \"None\" to set date by default):")
+
+
+def add_note_title_condition(message):
+    user_id = message.from_user.id
+    habit = get_habit(user_id)
+    if habit and get_user_state(message).startswith("add_note_for_habit"):
+        return True
+    return False
+
+
+@bot.message_handler(func=add_note_title_condition, chat_types=['private'])
+def add_note_title(message):
+    user_id = message.from_user.id
+    user: User = get_user(user_id)
+    habit: UserHabit = get_habit(user_id)
+    title: str = message.text
+    if title.strip().lower() == "none":
+        from datetime import datetime
+        title = datetime.now().strftime("%Y/ %m/ %d")
+    note = HabitNote(title=title, habit=habit)
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    set_user_state(user, f"add_text_for_habit_note-{note.id}")
+    bot.send_message(user_id, "Ok, please write your note now:")
+
+
+def add_note_for_habit_condition(message):
+    if get_user_state(message).startswith("add_text_for_habit_note"):
+        return True
+    return False
+
+
+@bot.message_handler(func=add_note_for_habit_condition, chat_types=['private'])
+def add_note_for_habit(message):
+    user_id = message.from_user.id
+    user = get_user(user_id)
+    habit_note_id = int(user.state[-1])
+    habit_note: HabitNote = db.query(HabitNote).filter(HabitNote.id == habit_note_id).first()
+    habit_note.note = message.text
+    db.add(habit_note)
+    db.commit()
+    db.refresh(habit_note)
+    set_user_state(user, f"habit-{habit_note.habit_id}")
+    bot.send_message(user_id, "Note added for habit successfully")
+
+
+def list_habit_notes_condition(message):
+    user_id = message.from_user.id
+    habit = get_habit(user_id)
+    if habit and get_user_state(message).startswith("habit") and message.text == "Notes":
+        return True
+    return False
+
+
+@bot.message_handler(func=list_habit_notes_condition, chat_types=['private'])
+def list_habit_notes(message):
+    user_id = message.from_user.id
+    habit: UserHabit = get_habit(user_id)
+    notes: [HabitNote] = db.query(HabitNote).filter(HabitNote.habit_id == habit.id).all()
+    if notes:
+        keyboard = InlineKeyboardMarkup(row_width=1)
+        for note in notes:
+            keyboard.row(InlineKeyboardButton(note.title, callback_data=f"show_habit_note-{note.id}"))
+        bot.send_message(user_id, f"List Of your notes for {habit.name}:", reply_markup=keyboard)
+    else:
+        bot.send_message(user_id, f"There is not recorded note for this habit!")
 
 bot.infinity_polling()
