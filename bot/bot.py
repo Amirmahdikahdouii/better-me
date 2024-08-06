@@ -334,7 +334,8 @@ def add_note_title(message):
     title: str = message.text
     if title.strip().lower() == "none":
         from datetime import datetime
-        title = datetime.now().strftime("%Y/ %m/ %d")
+        title = "Note: "
+        title += datetime.now().strftime("%Y/%m/%d")
     note = HabitNote(title=title, habit=habit)
     db.add(note)
     db.commit()
@@ -383,5 +384,22 @@ def list_habit_notes(message):
         bot.send_message(user_id, f"List Of your notes for {habit.name}:", reply_markup=keyboard)
     else:
         bot.send_message(user_id, f"There is not recorded note for this habit!")
+
+
+def view_note_callback_condition(callback):
+    if callback.data.startswith("show_habit_note"):
+        return True
+    return False
+
+
+@bot.callback_query_handler(func=view_note_callback_condition)
+def view_note_detail(callback):
+    note_id = int(callback.data[-1])
+    note: HabitNote = db.query(HabitNote).filter(HabitNote.id == note_id).first()
+    bot.delete_message(callback.message.chat.id, callback.json['message']['message_id'])
+    note_body: str = f"*{note.title}* \n"
+    note_body += f"{note.note}"
+    bot.send_message(callback.from_user.id, note_body, parse_mode="MarkdownV2")
+
 
 bot.infinity_polling()
