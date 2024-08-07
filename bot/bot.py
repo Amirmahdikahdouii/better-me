@@ -130,7 +130,7 @@ def list_habit(message):
     user = get_user(user_id)
     output = ""
     for i, habit in enumerate(user.habits, start=1):
-        output += f"{i}. {habit.name}"
+        output += f"{i}. {habit.name} \n"
     if output == "":
         bot.send_message(user_id, "No Item founded", reply_markup=main_menu())
     else:
@@ -178,7 +178,8 @@ def select_user_habit(callback):
     bot.delete_message(callback.message.chat.id, callback.json['message']['message_id'])
     keyboard = select_habit_keyboard()
     bot.send_message(
-        callback.from_user.id, f"Ok, {habit} selected!\n What do you want to do now?", reply_markup=keyboard
+        callback.from_user.id, f"Ok, *{habit}* selected!\n What do you want to do now?", reply_markup=keyboard,
+        parse_mode="MarkdownV2"
     )
     user = get_user(callback.from_user.id)
     set_user_state(user, f"habit-{habit.id}")
